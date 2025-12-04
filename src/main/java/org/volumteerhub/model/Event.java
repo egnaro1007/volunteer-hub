@@ -5,46 +5,52 @@ import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-import org.volumteerhub.common.UserRole;
+import org.volumteerhub.common.EventStatus;
 
 import java.time.Instant;
 import java.util.UUID;
 import java.util.List;
 
 @Entity
-@Table(name = "users", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"username"})
-})
+@Table(name = "event")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @EntityListeners(AuditingEntityListener.class)
-public class User {
+public class Event {
 
     @Id
     @GeneratedValue
     private UUID id;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_id", nullable = false)
+    private User owner;
+
+    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Registration> registrations;
 
     @Column(nullable = false)
-    private String firstname;
+    private String name;
 
-    @Column(nullable = false)
-    private String lastname;
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
 
-    @Column(nullable = false, unique = true)
-    private String username;
+    @Column(nullable = false, name = "date_deadline")
+    private Instant dateDeadline;
 
-    @Column(nullable = false, name = "password_hash")
-    private String passwordHash;
+    @Column(nullable = false, name = "start_date")
+    private Instant startDate;
+
+    @Column(nullable = false, name = "end_date")
+    private Instant endDate;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private UserRole role;
+    @Builder.Default
+    private EventStatus status = EventStatus.DRAFT;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
@@ -54,4 +60,3 @@ public class User {
     @Column(nullable = false)
     private Instant updatedAt;
 }
-

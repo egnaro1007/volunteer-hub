@@ -5,15 +5,14 @@ import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-import org.volumteerhub.common.UserRole;
+import org.volumteerhub.common.RegistrationStatus;
 
 import java.time.Instant;
 import java.util.UUID;
-import java.util.List;
 
 @Entity
-@Table(name = "users", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"username"})
+@Table(name = "registration", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"user_id", "event_id"})
 })
 @Getter
 @Setter
@@ -21,30 +20,24 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 @EntityListeners(AuditingEntityListener.class)
-public class User {
+public class Registration {
 
     @Id
     @GeneratedValue
     private UUID id;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Registration> registrations;
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
-    @Column(nullable = false)
-    private String firstname;
-
-    @Column(nullable = false)
-    private String lastname;
-
-    @Column(nullable = false, unique = true)
-    private String username;
-
-    @Column(nullable = false, name = "password_hash")
-    private String passwordHash;
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "event_id", nullable = false)
+    private Event event;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private UserRole role;
+    @Builder.Default
+    private RegistrationStatus status = RegistrationStatus.PENDING;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
@@ -54,4 +47,3 @@ public class User {
     @Column(nullable = false)
     private Instant updatedAt;
 }
-

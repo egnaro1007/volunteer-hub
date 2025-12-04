@@ -38,10 +38,27 @@ public class JwtUtil {
      */
     public static String getUsernameFromToken(String token) {
         return Jwts.parser()
-                .verifyWith((SecretKey) KEY) // Modern method for key verification
+                .verifyWith((SecretKey) KEY)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload()
                 .getSubject();
+    }
+
+    /**
+     * Validate JWT
+     * @param token the token need to be validated
+     * @return true if token is valid, false if not.
+     */
+    public static boolean validateToken(String token) {
+        try {
+            Jwts.parser()
+                .verifyWith((SecretKey) KEY)
+                .build()
+                .parseSignedClaims(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

@@ -87,7 +87,6 @@ public class EventService {
         if (dto.getDateDeadline() != null) event.setDateDeadline(dto.getDateDeadline());
         if (dto.getStartDate() != null) event.setStartDate(dto.getStartDate());
         if (dto.getEndDate() != null) event.setEndDate(dto.getEndDate());
-        if (dto.getStatus() != null) event.setStatus(dto.getStatus());
 
         return toDto(eventRepository.save(event));
     }

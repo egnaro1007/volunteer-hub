@@ -5,6 +5,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import org.springframework.hateoas.server.core.Relation;
 import org.volumteerhub.common.EventStatus;
 import org.volumteerhub.common.validation.OnCreate;
 
@@ -12,6 +13,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Data
+@Relation(collectionRelation = "events")
 public class EventDto {
 
     // Read-only (use on GET)

@@ -3,6 +3,11 @@ package org.volumteerhub.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PagedResourcesAssembler;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.PagedModel;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -37,13 +42,18 @@ public class EventController {
 
     // LIST (page + filter)
     @GetMapping
-    public Page<EventDto> list(
+    public ResponseEntity<PagedModel<EntityModel<EventDto>>> list(
             @RequestParam(required = false) EventStatus status,
             @RequestParam(required = false) UUID ownerId,
             @RequestParam(required = false) String search,
-            Pageable pageable
+            Pageable pageable,
+            PagedResourcesAssembler<EventDto> assembler
     ) {
-        return eventService.list(status, ownerId, search, pageable);
+        Page<EventDto> page = eventService.list(status, ownerId, search, pageable);
+        PagedModel<EntityModel<EventDto>> resources = assembler.toModel(page, event -> EntityModel.of(event,
+                linkTo(methodOn(EventController.class).get(event.getId())).withSelfRel()
+        ));
+        return ResponseEntity.ok(resources);
     }
 
     // UPDATE

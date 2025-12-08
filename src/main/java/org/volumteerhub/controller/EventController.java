@@ -70,4 +70,16 @@ public class EventController {
     public void delete(@PathVariable UUID id) {
         eventService.delete(id);
     }
+
+    // Submit event to admin
+    @GetMapping("/{id}/submit")
+    @ResponseStatus(HttpStatus.OK)
+    public ResponseEntity<EventDto> submit(@PathVariable UUID id) {
+        try {
+            EventDto event = eventService.submit(id);
+            return ResponseEntity.status(HttpStatus.OK).body(event);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+    }
 }

@@ -153,4 +153,18 @@ public class EventService {
 
         eventRepository.deleteById(id);
     }
+
+    // SUBMIT
+    public EventDto submit(UUID id) {
+        Event event = eventRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Event not found"));
+
+        validateOwnership(event);
+
+        if (event.getStatus() == EventStatus.DRAFT) {
+            event.setStatus(EventStatus.PENDING);
+        }
+
+        return toDto(eventRepository.save(event));
+    }
 }

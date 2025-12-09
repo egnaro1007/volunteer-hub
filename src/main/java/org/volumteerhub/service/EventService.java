@@ -4,10 +4,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.volumteerhub.dto.EventDto;
+import org.volumteerhub.common.exception.ResourceNotFoundException;
+import org.volumteerhub.common.exception.UnauthorizedAccessException;
 import org.volumteerhub.common.EventStatus;
 import org.volumteerhub.common.UserRole;
-import org.volumteerhub.dto.EventDto;
 import org.volumteerhub.model.Event;
 import org.volumteerhub.model.User;
 import org.volumteerhub.repository.EventRepository;
@@ -23,8 +27,34 @@ public class EventService {
     private final EventRepository eventRepository;
     private final UserRepository userRepository;
 
-    // Convert Entity -> DTO
+    private User getCurrentAuthenticatedUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new UnauthorizedAccessException("User is not authenticated.");
+        }
+        String username = authentication.getName();
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
+    }
+
+    private boolean isCurrentUserAdmin(User user) {
+        return user.getRole() == UserRole.ADMIN;
+    }
+
+    private void validateOwnership(Event event, User currentUser) {
+        if (!event.getOwner().equals(currentUser)) {
+            throw new UnauthorizedAccessException("User is not the owner of event " + event.getId());
+        }
+    }
+
+    private Event findEventById(UUID id) {
+        return eventRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Event not found with id: " + id));
+    }
+
+
     private EventDto toDto(Event event) {
+        // Use Lombok's @Builder on DTO or a proper mapper for cleaner code
         EventDto dto = new EventDto();
         dto.setId(event.getId());
         dto.setName(event.getName());
@@ -37,37 +67,9 @@ public class EventService {
         return dto;
     }
 
-    /**
-     * Validate that the user who send request is owner or not. Throw exception if not.
-     * @param event The event need to be validated
-     */
-    private void validateOwnership(Event event) {
-        String username = org.springframework.security.core.context.SecurityContextHolder.getContext()
-                .getAuthentication().getName();
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-    
-        if (!event.getOwner().equals(user)) {
-            throw new RuntimeException("Not owner");
-        }
-    }
-
-    private boolean validateAdmin() {
-        String username = org.springframework.security.core.context.SecurityContextHolder.getContext()
-                .getAuthentication().getName();
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Owner not found"));
-
-        return user.getRole() == UserRole.ADMIN;
-    }
-    
     // CREATE
     public EventDto create(EventDto dto) {
-
-        String username = org.springframework.security.core.context.SecurityContextHolder.getContext()
-                .getAuthentication().getName();
-        User owner = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Owner not found"));
+        User owner = getCurrentAuthenticatedUser();
 
         Event event = Event.builder()
                 .owner(owner)
@@ -84,21 +86,20 @@ public class EventService {
 
     // READ BY ID
     public EventDto get(UUID id) {
-        Event event = eventRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Event not found"));
+        Event event = findEventById(id);
+        User currentUser = getCurrentAuthenticatedUser();
 
-        if ((event.getStatus() != EventStatus.APPROVED) && !this.validateAdmin()) {
-            validateOwnership(event);
+        if (event.getStatus() != EventStatus.APPROVED) {
+            if (!isCurrentUserAdmin(currentUser)) {
+                validateOwnership(event, currentUser);
+            }
         }
         return toDto(event);
     }
 
     // LIST + FILTER + PAGE
     public Page<EventDto> list(EventStatus status, UUID ownerId, String search, Pageable pageable) {
-        String username = org.springframework.security.core.context.SecurityContextHolder.getContext()
-                .getAuthentication().getName();
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        User currentUser = getCurrentAuthenticatedUser();
 
         Specification<Event> baseFilter = Specification.allOf(
                 EventSpecifications.hasStatus(status),
@@ -106,34 +107,35 @@ public class EventService {
                 EventSpecifications.nameContains(search)
         );
 
-        // Rule 1: user.role == 'ADMIN' (Admin can bypass all checks)
-        if (user.getRole() == UserRole.ADMIN) {
+        // Rule 1: Admin can see everything
+        if (isCurrentUserAdmin(currentUser)) {
             return eventRepository.findAll(baseFilter, pageable).map(this::toDto);
         }
 
-        Specification<Event> spec = ((root, query, criteriaBuilder) -> {
+        Specification<Event> securitySpec = ((root, query, criteriaBuilder) -> {
             // Rule 2: event.status == 'APPROVED' (Publicly visible)
             jakarta.persistence.criteria.Predicate approvedStatus = criteriaBuilder.equal(
                     root.get("status"), EventStatus.APPROVED
             );
 
-            // Rule 3: event.ownerId == user.id (Owner can see their own)
+            // Rule 3: event.ownerId == currentUser.id (Owner can see their own)
             jakarta.persistence.criteria.Predicate isOwner = criteriaBuilder.equal(
-                    root.get("owner").get("id"), user.getId()
+                    root.get("owner").get("id"), currentUser.getId()
             );
 
             return criteriaBuilder.or(approvedStatus, isOwner);
         });
 
-        return eventRepository.findAll(spec, pageable).map(this::toDto);
+        Specification<Event> finalSpec = baseFilter.and(securitySpec);
+
+        return eventRepository.findAll(finalSpec, pageable).map(this::toDto);
     }
 
     // UPDATE
     public EventDto update(UUID id, EventDto dto) {
-        Event event = eventRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Event not found"));
-
-        validateOwnership(event);
+        Event event = findEventById(id);
+        User currentUser = getCurrentAuthenticatedUser();
+        validateOwnership(event, currentUser);
 
         if (dto.getName() != null) event.setName(dto.getName());
         if (dto.getDescription() != null) event.setDescription(dto.getDescription());
@@ -146,25 +148,24 @@ public class EventService {
 
     // DELETE
     public void delete(UUID id) {
-        Event event = eventRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Event not found"));
-
-        validateOwnership(event);
+        Event event = findEventById(id);
+        User currentUser = getCurrentAuthenticatedUser();
+        validateOwnership(event, currentUser);
 
         eventRepository.deleteById(id);
     }
 
-    // SUBMIT
+    // Submit to admin
     public EventDto submit(UUID id) {
-        Event event = eventRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Event not found"));
+        Event event = findEventById(id);
+        User currentUser = getCurrentAuthenticatedUser();
+        validateOwnership(event, currentUser);
 
-        validateOwnership(event);
-
-        if (event.getStatus() == EventStatus.DRAFT) {
+        if (event.getStatus() == EventStatus.DRAFT || event.getStatus() == EventStatus.REJECTED) {
             event.setStatus(EventStatus.PENDING);
+            eventRepository.save(event);
         }
 
-        return toDto(eventRepository.save(event));
+        return toDto(event);
     }
 }

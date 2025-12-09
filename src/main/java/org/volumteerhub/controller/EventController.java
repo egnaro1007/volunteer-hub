@@ -72,7 +72,7 @@ public class EventController {
     }
 
     // Submit event to admin
-    @GetMapping("/{id}/submit")
+    @PostMapping("/{id}/submit")
     @ResponseStatus(HttpStatus.OK)
     public ResponseEntity<EventDto> submit(@PathVariable UUID id) {
         try {

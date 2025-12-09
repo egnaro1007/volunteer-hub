@@ -168,4 +168,36 @@ public class EventService {
 
         return toDto(event);
     }
+
+
+    private EventDto updateEventStatus(UUID eventId, EventStatus requiredStatus, EventStatus newStatus) {
+        Event event = findEventById(eventId);
+
+        if (event.getStatus() == requiredStatus) {
+            event.setStatus(newStatus);
+            eventRepository.save(event);
+        }
+
+        return toDto(event);
+    }
+
+    // Approve
+    public EventDto approve(UUID id) {
+        User currentUser = getCurrentAuthenticatedUser();
+        if (!isCurrentUserAdmin(currentUser)) {
+            throw new UnauthorizedAccessException("Admin only operation.");
+        }
+
+        return updateEventStatus(id, EventStatus.PENDING, EventStatus.APPROVED);
+    }
+
+    // Reject
+    public EventDto reject(UUID id) {
+        User currentUser = getCurrentAuthenticatedUser();
+        if (!isCurrentUserAdmin(currentUser)) {
+            throw new UnauthorizedAccessException("Admin only operation.");
+        }
+
+        return updateEventStatus(id, EventStatus.PENDING, EventStatus.REJECTED);
+    }
 }

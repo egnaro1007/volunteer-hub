@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.multipart.MultipartException;
 import org.volumteerhub.dto.ErrorResponse;
 
 @ControllerAdvice
@@ -46,13 +47,13 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleResourceNotFoundException(
-            ResourceNotFoundException ex, WebRequest request) {
+            ResourceNotFoundException e, WebRequest request) {
 
         HttpStatus status = HttpStatus.NOT_FOUND;
 
         ErrorResponse errorResponse = ErrorResponse.build(
                 status,
-                ex.getMessage(),
+                e.getMessage(),
                 request.getDescription(false).replace("uri=", "")
         );
 
@@ -64,13 +65,49 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(UnauthorizedAccessException.class)
     public ResponseEntity<ErrorResponse> handleUnauthorizedAccessException(
-            UnauthorizedAccessException ex, WebRequest request) {
+            UnauthorizedAccessException e, WebRequest request) {
 
         HttpStatus status = HttpStatus.FORBIDDEN;
 
         ErrorResponse errorResponse = ErrorResponse.build(
                 status,
-                ex.getMessage(),
+                e.getMessage(),
+                request.getDescription(false).replace("uri=", "")
+        );
+
+        return new ResponseEntity<>(errorResponse, status);
+    }
+
+    /**
+     * Handles BadRequestException and returns HTTP 400 FORBIDDEN.
+     */
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ErrorResponse> handleBadRequestException(
+            BadRequestException e, WebRequest request) {
+
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+
+        ErrorResponse errorResponse = ErrorResponse.build(
+                status,
+                e.getMessage(),
+                request.getDescription(false).replace("uri=", "")
+        );
+
+        return new ResponseEntity<>(errorResponse, status);
+    }
+
+    /**
+     * Handles MultipartException and returns HTTP 400 BAD REQUEST.
+     */
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ErrorResponse> handleMultipartException(
+            MultipartException e, WebRequest request) {
+
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+
+        ErrorResponse errorResponse = ErrorResponse.build(
+                status,
+                "Invalid multipart request: " + e.getMessage(),
                 request.getDescription(false).replace("uri=", "")
         );
 
@@ -78,12 +115,12 @@ public class GlobalExceptionHandler {
     }
 
 //    @ExceptionHandler(Exception.class)
-//    public ResponseEntity<ErrorResponse> handleAllExceptions(Exception ex, WebRequest request) {
+//    public ResponseEntity<ErrorResponse> handleAllExceptions(Exception e, WebRequest request) {
 //        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
 //
 //        ErrorResponse errorResponse = ErrorResponse.build(
 //                status,
-//                "An unexpected error occurred: " + ex.getMessage(),
+//                "An unexpected error occurred: " + e.getMessage(),
 //                request.getDescription(false).replace("uri=", "")
 //        );
 //

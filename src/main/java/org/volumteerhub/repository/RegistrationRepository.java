@@ -3,7 +3,9 @@ package org.volumteerhub.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import org.volumteerhub.common.RegistrationStatus;
+import org.volumteerhub.model.Event;
 import org.volumteerhub.model.Registration;
+import org.volumteerhub.model.User;
 
 import java.util.List;
 import java.util.Optional;
@@ -21,4 +23,6 @@ public interface RegistrationRepository extends JpaRepository<Registration, UUID
     List<Registration> findByStatus(RegistrationStatus status);
 
     List<Registration> findByStatusAndEventId(RegistrationStatus status, UUID eventId);
+
+    Optional<Registration> getByUserAndEvent(User volunteer, Event event);
 }

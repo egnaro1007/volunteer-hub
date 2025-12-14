@@ -27,7 +27,7 @@ public class PostMedia {
     private Post post;
 
     @Column(nullable = false)
-    private String url;
+    private UUID resourceId;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)

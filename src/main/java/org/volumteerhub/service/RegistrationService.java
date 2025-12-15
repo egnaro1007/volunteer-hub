@@ -1,6 +1,9 @@
 package org.volumteerhub.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.volumteerhub.common.enumeration.EventStatus;
@@ -13,10 +16,10 @@ import org.volumteerhub.model.Registration;
 import org.volumteerhub.model.User;
 import org.volumteerhub.repository.EventRepository;
 import org.volumteerhub.repository.RegistrationRepository;
+import org.volumteerhub.specification.RegistrationSpecifications;
 
 import java.time.Instant;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +46,9 @@ public class RegistrationService {
 
     // --- COMMON ---
 
+    /**
+     * Get a Registration
+     */
     public RegistrationDto getRegistration(UUID id) {
         Registration registration = findRegistrationById(id);
         User currentUser = securityService.getCurrentAuthenticatedUser();
@@ -57,6 +63,52 @@ public class RegistrationService {
         }
 
         return toDto(registration);
+    }
+
+    /**
+     * List all Registration meet the criteria.
+     * @param status Filter by status
+     * @param eventId Filter by event id
+     * @param userId Filter by volunteer id
+     * @param pageable Pageable
+     * @return All the registration DTOs.
+     */
+    @Transactional(readOnly = true)
+    public Page<RegistrationDto> list(RegistrationStatus status, UUID eventId, UUID userId, Pageable pageable) {
+        User currentUser = securityService.getCurrentAuthenticatedUser();
+
+        // 1. Build Base Filter (User-provided criteria)
+        Specification<Registration> baseFilter = Specification.allOf(
+                RegistrationSpecifications.hasStatus(status),
+                RegistrationSpecifications.hasEventId(eventId),
+                RegistrationSpecifications.hasUserId(userId)
+        );
+
+        // 2. Rule: Admin can see everything
+        if (securityService.isCurrentUserAdmin()) {
+            return registrationRepository.findAll(baseFilter, pageable).map(this::toDto);
+        }
+
+        // 3. Define Security Specification (Non-Admin visibility rules)
+        Specification<Registration> securitySpec = (root, query, criteriaBuilder) -> {
+            // Rule A: The registration belongs to the current user (I am the Volunteer)
+            jakarta.persistence.criteria.Predicate isVolunteer = criteriaBuilder.equal(
+                    root.get("user").get("id"), currentUser.getId()
+            );
+
+            // Rule B: The registration belongs to an event owned by the current user (I am the Event Manager)
+            jakarta.persistence.criteria.Predicate isEventManager = criteriaBuilder.equal(
+                    root.get("event").get("owner").get("id"), currentUser.getId()
+            );
+
+            // Access is allowed if Rule A OR Rule B is met
+            return criteriaBuilder.or(isVolunteer, isEventManager);
+        };
+
+        // 4. Combine Base Filter and Security Specification
+        Specification<Registration> finalSpec = baseFilter.and(securitySpec);
+
+        return registrationRepository.findAll(finalSpec, pageable).map(this::toDto);
     }
 
 

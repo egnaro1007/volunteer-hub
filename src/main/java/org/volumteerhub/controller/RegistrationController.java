@@ -1,13 +1,22 @@
 package org.volumteerhub.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PagedResourcesAssembler;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.PagedModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.volumteerhub.common.enumeration.RegistrationStatus;
 import org.volumteerhub.dto.RegistrationDto;
 import org.volumteerhub.service.RegistrationService;
 
 import java.util.UUID;
+
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
 
 @RestController
 @RequestMapping("/api/registrations")
@@ -22,6 +31,25 @@ public class RegistrationController {
     public ResponseEntity<RegistrationDto> getRegistration(@PathVariable UUID id) {
         RegistrationDto registration = registrationService.getRegistration(id);
         return ResponseEntity.ok(registration);
+    }
+
+    @GetMapping
+    public ResponseEntity<PagedModel<EntityModel<RegistrationDto>>> list(
+            @RequestParam(required = false) RegistrationStatus status,
+            @RequestParam(required = false) UUID eventId,
+            @RequestParam(required = false) UUID userId,
+            Pageable pageable,
+            PagedResourcesAssembler<RegistrationDto> assembler
+    ) {
+        Page<RegistrationDto> page = registrationService.list(status, eventId, userId, pageable);
+
+        PagedModel<EntityModel<RegistrationDto>> resources = assembler.toModel(page, registration ->
+                EntityModel.of(registration,
+                        linkTo(methodOn(RegistrationController.class).getRegistration(registration.getId())).withSelfRel()
+                )
+        );
+
+        return ResponseEntity.ok(resources);
     }
 
     // --- Volunteer Endpoints ---

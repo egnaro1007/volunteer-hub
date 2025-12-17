@@ -46,6 +46,9 @@ public class User {
     @Column(nullable = false)
     private UserRole role;
 
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PushSubscription> pushSubscriptions;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private Instant createdAt;

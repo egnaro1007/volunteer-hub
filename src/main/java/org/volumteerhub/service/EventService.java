@@ -22,6 +22,7 @@ public class EventService {
 
     private final EventRepository eventRepository;
     private final UserService userService;
+    private final NotificationDispatcherService notificationDispatcherService;
 
     private void validateOwnership(Event event, User currentUser) {
         if (!event.getOwner().equals(currentUser)) {
@@ -147,6 +148,10 @@ public class EventService {
             event.setStatus(EventStatus.PENDING);
             eventRepository.save(event);
         }
+
+        notificationDispatcherService.notifyAllAdmins(
+                "New event submit",
+                event.getName() + " by " + event.getOwner().getFirstname() + " " + event.getOwner().getLastname());
 
         return toDto(event);
     }

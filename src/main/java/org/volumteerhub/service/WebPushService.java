@@ -49,7 +49,7 @@ public class WebPushService {
 
         pushSubscriptionRepository.findByEndpoint(subscription.endpoint)
                 .ifPresentOrElse(
-                        existing -> log.info("Subscription already exists for this endpoint"),
+                        existing -> {},
                         () -> {
                             PushSubscription newSub = PushSubscription.builder()
                                     .endpoint(subscription.endpoint)
@@ -58,17 +58,38 @@ public class WebPushService {
                                     .user(currentUser)
                                     .build();
                             pushSubscriptionRepository.save(newSub);
-                            log.info("Successfully saved new subscription to database");
+                            log.debug("Successfully saved new subscription to database");
+                            this.sendNotificationToCurrentUser("Subscribed!", "Device registered successfully.");
                         }
                 );
 
-        this.sendToBrowser(subscription, "{\"title\": \"Subscribed!\", \"body\": \"Device registered successfully.\"}");
+//        this.sendToBrowser(subscription, "{\"title\": \"Subscribed!\", \"body\": \"Device registered successfully.\"}");
     }
 
     public void sendTestNotification() {
-        log.info("Send Test Push Notification");
-        this.sendNotificationToCurrentUser("{\"title\": \"Push Notification Test\", \"body\": \"Push notification works normally!!!\"}");
+        log.debug("Send Test Push Notification");
+        this.sendNotificationToCurrentUser("Push Notification Test", "Push notification works normally!!!","127.0.0.1");
     }
+
+    public void sendNotificationToCurrentUser (String title, String body, String url) {
+        User currentUser = userService.getCurrentAuthenticatedUser();
+        String payload = String.format(
+                "{\"title\": \"%s\", \"body\": \"%s\", \"url\": \"%s\"}",
+                title, body, url
+        );
+
+        this.sendNotificationToUser(currentUser, payload);
+    }
+    public void sendNotificationToCurrentUser (String title, String body) {
+        User currentUser = userService.getCurrentAuthenticatedUser();
+        String payload = String.format(
+                "{\"title\": \"%s\", \"body\": \"%s\"}",
+                title, body
+        );
+
+        this.sendNotificationToUser(currentUser, payload);
+    }
+
 
     public void sendNotificationToCurrentUser (String messageJson){
         User currentUser = userService.getCurrentAuthenticatedUser();
@@ -81,14 +102,14 @@ public class WebPushService {
                 title, body, url
         );
 
-        sendNotificationToUser(user, payload);
+        this.sendNotificationToUser(user, payload);
     }
 
     public void sendNotificationToUser(User user, String payload) {
         List<PushSubscription> subs = user.getPushSubscriptions();
 
         if (subs == null || subs.isEmpty()) {
-            log.warn("No subscriptions found for user: {}", user.getUsername());
+            log.error("No subscriptions found for user: {}", user.getUsername());
             return;
         }
 
@@ -102,7 +123,7 @@ public class WebPushService {
     }
 
     private void sendToBrowser(Subscription subscription, String payload) {
-        if (pushService != null) {
+        if (pushService == null) {
             return;
         }
         try {
@@ -111,8 +132,8 @@ public class WebPushService {
 
             int statusCode = response.getStatusLine().getStatusCode();
             switch (statusCode) {
-                case 201 -> log.info("Push sent successfully (201)");
-                case 403 -> log.error("403 Forbidden: Check your VAPID keys/Subject");
+                case 201 -> log.debug("Push sent successfully (201)");
+                case 403 -> log.error("403 Forbidden: Check VAPID keys/Subject");
                 case 410 -> {
                     log.warn("410 Gone: User unsubscribed. Removing from DB.");
                     pushSubscriptionRepository.findByEndpoint(subscription.endpoint)

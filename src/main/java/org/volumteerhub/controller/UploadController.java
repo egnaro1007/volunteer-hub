@@ -10,7 +10,6 @@ import org.volumteerhub.dto.ErrorResponse;
 import org.volumteerhub.service.StorageService;
 
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/uploads")
@@ -25,9 +24,9 @@ public class UploadController {
     @PostMapping
     public ResponseEntity<?> uploadTempFile(@RequestParam("file") MultipartFile file) {
         try {
-            UUID tempFileId = storageService.saveTempFile(file);
+            String tempFileName = storageService.saveTempFile(file);
 
-            return ResponseEntity.ok(Map.of("tempId", tempFileId));
+            return ResponseEntity.ok(Map.of("tempFileName", tempFileName));
         } catch (MultipartException e) {
             throw new BadRequestException("Invalid multipart request: " + e.getMessage());
         } catch (Exception e) {

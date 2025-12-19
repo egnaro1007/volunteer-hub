@@ -37,7 +37,7 @@ public class StorageService {
      * Save file to /temp folder
      * @return The UUID of the temporary file
      */
-    public UUID saveTempFile(MultipartFile file) throws IOException {
+    public String saveTempFile(MultipartFile file) throws IOException {
         UUID fileId = UUID.randomUUID();
 
         // Extract extension (e.g. .jpg) to keep the filename valid
@@ -53,37 +53,45 @@ public class StorageService {
 
         Files.copy(file.getInputStream(), tempFilePath, StandardCopyOption.REPLACE_EXISTING);
 
-        return fileId;
+        return newFilename;
+    }
+
+    public String moveTempFileToPermanent(String tempFileName, UUID eventId, UUID postId) throws IOException {
+        String subPath = eventId.toString() + "/" + postId.toString();
+        return processMove(tempFileName, subPath);
+    }
+
+    public String moveTempFileToPermanent(String tempFileName, UUID eventId) throws IOException {
+        String subPath = eventId.toString() + "/banner";
+        return processMove(tempFileName, subPath);
     }
 
     /**
-     * Move file from /temp to /uploads/{postId}/
-     * @param tempFileId The UUID returned from saveTempFile
-     * @param postId The UUID of the Post (destination folder)
-     * @return The relative path to the new file (e.g., "uploads/uuid-post/file.jpg")
+     * Handle the file system operations
      */
-    public String moveTempFileToPermanent(UUID tempFileId, UUID postId) throws IOException {
-        // Find the file in temp (we need to find it because we don't know the extension)
+    private String processMove(String filename, String subPath) throws IOException {
+        if (!filename.contains(".")) {
+            throw new IOException("Temp file not found: " + filename);
+        }
+
         Path sourcePath;
         try (Stream<Path> stream = Files.list(props.getTempPath())) {
             sourcePath = stream
-                    .filter(p -> p.getFileName().toString().startsWith(tempFileId.toString()))
+                    .filter(p -> p.getFileName().toString().startsWith(filename))
                     .findFirst()
-                    .orElseThrow(() -> new IOException("Temp file not found: " + tempFileId));
+                    .orElseThrow(() -> new IOException("Temp file not found: " + filename));
         }
 
-        // reate the destination folder: /uploads/{postId}/
-        Path postDirPath = props.getUploadsPath().resolve(postId.toString());
-        if (!Files.exists(postDirPath)) {
-            Files.createDirectories(postDirPath);
+        // Create the destination folder: /uploads/{subPath}
+        Path destDirPath = props.getUploadsPath().resolve(subPath);
+        if (!Files.exists(destDirPath)) {
+            Files.createDirectories(destDirPath);
         }
 
         // Move the file
-        String filename = sourcePath.getFileName().toString();
-        Path destinationPath = postDirPath.resolve(filename);
-
+        Path destinationPath = destDirPath.resolve(filename);
         Files.move(sourcePath, destinationPath, StandardCopyOption.REPLACE_EXISTING);
 
-        return "/uploads/" + postId + "/" + filename;
+        return "/uploads/" + subPath + "/" + filename;
     }
 }

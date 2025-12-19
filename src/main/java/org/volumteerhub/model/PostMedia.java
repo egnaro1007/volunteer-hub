@@ -29,6 +29,9 @@ public class PostMedia {
     @Column(nullable = false)
     private UUID resourceId;
 
+    @Column
+    private String path;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private Instant createdAt;

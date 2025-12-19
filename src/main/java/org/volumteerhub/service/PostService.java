@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.volumteerhub.common.enumeration.ReactionType;
+import org.volumteerhub.common.exception.BadRequestException;
 import org.volumteerhub.common.exception.ResourceNotFoundException;
 import org.volumteerhub.dto.PostDto;
 import org.volumteerhub.model.*;
@@ -45,7 +46,7 @@ public class PostService {
 
         if (post.getMedias() != null) {
             List<String> urls = post.getMedias().stream()
-                    .map(media -> "/uploads/" + post.getId() + "/" + media.getResourceId())
+                    .map(PostMedia::getPath)
                     .collect(Collectors.toList());
             dto.setMediaUrls(urls);
         }
@@ -67,11 +68,9 @@ public class PostService {
     @Transactional
     public PostDto create(UUID eventId, PostDto dto) {
         User currentUser = userService.getCurrentAuthenticatedUser();
-
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new ResourceNotFoundException("Event not found"));
 
-        // 1. Save the Post first to get an ID
         Post post = Post.builder()
                 .content(dto.getContent())
                 .user(currentUser)
@@ -80,32 +79,7 @@ public class PostService {
 
         post = postRepository.save(post);
 
-        // 2. Handle Media (Move from Temp -> Permanent)
-        if (dto.getMediaIds() != null && !dto.getMediaIds().isEmpty()) {
-            List<PostMedia> mediaList = new ArrayList<>();
-
-            for (UUID tempFileId : dto.getMediaIds()) {
-                try {
-                    // Move file on disk
-                    storageService.moveTempFileToPermanent(tempFileId, post.getId());
-
-                    // Create DB record
-                    PostMedia media = PostMedia.builder()
-                            .post(post)
-                            .resourceId(tempFileId) // The file keeps its UUID name
-                            .build();
-
-                    mediaList.add(media);
-                } catch (IOException e) {
-                    log.error("Failed to move media file {}", tempFileId, e);
-                    // Optional: Throw exception to rollback transaction
-                    throw new RuntimeException("Failed to attach media", e);
-                }
-            }
-            // Save all media records
-            postMediaRepository.saveAll(mediaList);
-            post.setMedias(mediaList); // Update reference for DTO conversion
-        }
+        handleMediaUploads(post, event.getId(), dto.getMediaFilenames());
 
         return toDto(post);
     }
@@ -125,10 +99,13 @@ public class PostService {
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
 
         User currentUser = userService.getCurrentAuthenticatedUser();
-
         userService.validateOwnerOrAdmin(post.getUser(), currentUser);
 
         post.setContent(dto.getContent());
+
+        if (dto.getMediaFilenames() != null && !dto.getMediaFilenames().isEmpty()) {
+            handleMediaUploads(post, post.getEvent().getId(), dto.getMediaFilenames());
+        }
 
         return toDto(postRepository.save(post));
     }
@@ -148,6 +125,55 @@ public class PostService {
         }
 
         postRepository.delete(post);
+    }
+
+    /**
+     * Extracted method to handle moving files and saving Media entities
+     */
+    private void handleMediaUploads(Post post, UUID eventId, List<String> tempFileNames) {
+        if (tempFileNames == null || tempFileNames.isEmpty()) return;
+
+        List<PostMedia> mediaList = new ArrayList<>();
+
+        for (String fileName : tempFileNames) {
+            try {
+                // 1. Extract the UUID from the filename (removing the extension)
+                // Example: "uuid.jpg" -> "uuid"
+                String uuidString = fileName.contains(".")
+                        ? fileName.substring(0, fileName.lastIndexOf("."))
+                        : fileName;
+
+                UUID tempFileId = UUID.fromString(uuidString);
+
+                // 2. Move file using your hierarchical structure: /uploads/{eventId}/{postId}/
+                // This preserves the extension as seen in StorageService.java
+                String path = storageService.moveTempFileToPermanent(fileName, eventId, post.getId());
+
+                // 3. Create DB record
+                PostMedia media = PostMedia.builder()
+                        .post(post)
+                        .resourceId(tempFileId)
+                        .path(path)
+                        .build();
+
+                mediaList.add(media);
+            } catch (IllegalArgumentException e) {
+                log.error("Invalid UUID format in filename: {}", fileName);
+                throw new BadRequestException("Invalid media ID format");
+            } catch (IOException e) {
+                log.error("Failed to move media file {}", fileName, e);
+                throw new RuntimeException("Failed to attach media", e);
+            }
+        }
+
+        postMediaRepository.saveAll(mediaList);
+
+        // Sync the post's media list for the DTO conversion
+        if (post.getMedias() == null) {
+            post.setMedias(mediaList);
+        } else {
+            post.getMedias().addAll(mediaList);
+        }
     }
 
 

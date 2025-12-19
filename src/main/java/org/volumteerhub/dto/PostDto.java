@@ -1,6 +1,6 @@
 package org.volumteerhub.dto;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import org.springframework.hateoas.server.core.Relation;
@@ -26,10 +26,8 @@ public class PostDto {
     @NotBlank(groups = {OnCreate.class, OnUpdate.class}, message = "Content cannot be empty")
     private String content;
 
-    // Input: UUIDs returned from upload API
-    @JsonIgnore
-    private List<UUID> mediaIds;
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private List<String> mediaFilenames;
 
-    // Response: List of media URLs or IDs
     private List<String> mediaUrls;
 }

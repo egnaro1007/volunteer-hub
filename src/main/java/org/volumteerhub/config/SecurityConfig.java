@@ -23,6 +23,10 @@ public class SecurityConfig {
                     .requestMatchers("/api/users").permitAll()
                     .requestMatchers("/api/auth/login").permitAll()
                     .requestMatchers("/api/admin/**").hasAuthority(UserRole.ADMIN.name())
+                    .requestMatchers(
+                            "/api/docs/**",
+                            "/api/swagger-ui/**"
+                    ).permitAll()
                     .anyRequest().authenticated()
             ).addFilterBefore(new JwtAuthenticationFilter(userDetailsService), UsernamePasswordAuthenticationFilter.class);
         return http.build();

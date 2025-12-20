@@ -79,7 +79,7 @@ public class PostService {
 
         post = postRepository.save(post);
 
-        handleMediaUploads(post, event.getId(), dto.getMediaFilenames());
+        handleMediaUploads(post, event.getId(), dto.getMediaUrls());
 
         return toDto(post);
     }
@@ -104,7 +104,7 @@ public class PostService {
         post.setContent(dto.getContent());
 
         if (dto.getMediaFilenames() != null && !dto.getMediaFilenames().isEmpty()) {
-            handleMediaUploads(post, post.getEvent().getId(), dto.getMediaFilenames());
+            handleMediaUploads(post, post.getEvent().getId(), dto.getMediaUrls());
         }
 
         return toDto(postRepository.save(post));

@@ -20,6 +20,9 @@ public class SecurityConfig {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
+                    .requestMatchers("/public").permitAll()
+                    .requestMatchers("/public/**").permitAll()
+                    .requestMatchers("/uploads/**").permitAll()
                     .requestMatchers("/api/users").permitAll()
                     .requestMatchers("/api/auth/login").permitAll()
                     .requestMatchers("/api/admin/**").hasAuthority(UserRole.ADMIN.name())

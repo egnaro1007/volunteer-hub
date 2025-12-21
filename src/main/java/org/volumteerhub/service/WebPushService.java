@@ -17,7 +17,9 @@ import org.volumteerhub.repository.PushSubscriptionRepository;
 
 
 import java.security.Security;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -44,6 +46,11 @@ public class WebPushService {
         );
     }
 
+    public Map<String, String> getPublicKey() {
+        return Collections.singletonMap("publicKey", vapidConfig.getPublicKey());
+    }
+
+
     public void subscribe(Subscription subscription) {
         User currentUser = userService.getCurrentAuthenticatedUser();
 
@@ -64,6 +71,13 @@ public class WebPushService {
                 );
 
 //        this.sendToBrowser(subscription, "{\"title\": \"Subscribed!\", \"body\": \"Device registered successfully.\"}");
+    }
+
+    public boolean verifySubscription(Subscription subscription) {
+        if (pushSubscriptionRepository.findByEndpoint(subscription.endpoint).isPresent()) {
+            return Boolean.TRUE;
+        }
+        return Boolean.FALSE;
     }
 
     public void sendTestNotification() {
